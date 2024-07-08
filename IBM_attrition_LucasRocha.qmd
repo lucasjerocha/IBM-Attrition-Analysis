@@ -1,0 +1,176 @@
+---
+title: "The IBM attrition dataset"
+subtitle: "Business Analytics (23/24)"
+format: 
+  html:
+    fig-width: 8
+    fig-height: 4
+    embed-resources: true
+    code-fold: false
+    standalone: true
+    toc: true
+    toc-location: left
+    toc-depth: 2
+    number-sections: true
+---
+
+```{r, message=FALSE}
+library(tidymodels)
+library(modeldata)
+library(themis)
+```
+
+# The `attrition` Dataset
+
+These data are from the *IBM Watson Analytics Lab*. It is a fictional data set created by IBM data scientists. There are 1470 rows
+
+```{r}
+attrition <- tibble(attrition)
+attrition <- janitor::clean_names(attrition)
+str(attrition)
+```
+
+Our job will be predicting the binary `attrition` target variable. As the positive case corresponds with the `Yes` level, we must modify the target variable so that it is the first level.
+
+```{r}
+attrition <- attrition |>
+  mutate(attrition = factor(attrition, levels = c("Yes", "No")))
+```
+
+Examining the target variable, we observe it is unbalanced (there are more negative than positive cases).
+
+```{r}
+ggplot(attrition, aes(attrition)) +
+  geom_bar() +
+  theme_minimal()
+```
+
+# Predicting Personnel Attrition
+
+Let's define a predicting workflow for the attrition dataset, completing the steps described in this section.
+
+## Train and Test Split
+
+Performing an adequate train and test split, keeping 20% of the dataset in the train set.
+
+```{r}
+set.seed(123123)
+attrition_split <- initial_split(attrition, prop = 0.8, strata = attrition)
+at_train <- training(attrition_split)
+at_test <- testing(attrition_split)
+```
+
+## Data Preprocessing
+
+Preparing an adequate preprocessing of the dataset in a recipe. Here are some hints to do the job:
+
+-   Transform factors into numeric variables. Take into account that there are ordered and unordered factors.
+-   Remove variables with low variance.
+-   Remove variables highly correlated with other features.
+
+Also considering oversampling or undersampling to account for class imbalance.
+
+```{r}
+at_rec <- recipe(attrition ~ ., data = at_train) %>%
+  step_dummy(all_nominal_predictors()) %>%
+  step_zv(all_predictors()) %>%
+  step_corr(all_numeric_predictors()) %>%
+  step_smote(attrition) #to consider oversampling
+at_rec
+
+```
+
+We can see the preprocessed dataset doing:
+
+```{r}
+at_rec %>%
+  prep() %>%
+  bake(new_data = NULL)
+```
+
+## Models
+
+Choosing two models that can be adequate for this dataset, and define workflows to integrate them with the recipe or recipes.
+
+```{r}
+# Logistic Regression Model
+logistic_model <- logistic_reg() %>%
+  set_engine("glm")
+
+logistic_workflow <- workflow() %>%
+  add_model(logistic_model) %>%
+  add_recipe(at_rec)
+
+# Random Forest Model
+forest_model <- rand_forest(trees = 50) %>%
+  set_engine("ranger") %>%
+  set_mode("classification")
+
+forest_workflow <- workflow() %>%
+  add_model(forest_model) %>%
+  add_recipe(at_rec)
+```
+
+## Cross Validation
+
+Defining a cross validation scheme with five folds, and evaluate each of the models with the following metrics:
+
+-   Accuracy.
+-   Sensitivity.
+-   Specificity.
+
+```{r}
+set.seed(123123)
+attrition_folds <- vfold_cv(at_train, v = 5, strata = attrition)
+
+```
+
+```{r}
+metrics <- metric_set(accuracy, sens, spec)
+
+```
+
+```{r}
+logistic_res <- fit_resamples(
+  logistic_workflow,
+  resamples = attrition_folds,
+  metrics = metrics
+)
+
+forest_res <- fit_resamples(
+  forest_workflow,
+  resamples = attrition_folds,
+  metrics = metrics
+)
+
+logistic_res %>%
+  collect_metrics()
+
+forest_res %>%
+  collect_metrics()
+```
+
+# Assessing Best Model
+
+Selecting the best model from the ones tested, train it with the whole train set and obtain the prediction metrics with the test set.
+
+-\> We have an imbalanced dataset, with more negative than positive cases. When comparing the two models, the random forest model has better accuracy and specificity, making it highly effective at identifying negative cases. However, the logistic regression model (model 1) has significantly better sensitivity, which is crucial for identifying positive cases. Therefore, I chose the logistic regression model to better address the class imbalance and improve the detection of positive cases.
+
+```{r}
+best_model <- logistic_workflow %>% fit(at_train)
+
+final_fit <- best_model %>%
+  predict(at_test) %>%
+  bind_cols(at_test) %>%
+  conf_mat(truth= attrition, estimate = .pred_class)
+
+
+metrics <- metric_set(sens, yardstick::spec, accuracy)
+best_model %>%
+  predict(at_test) %>%
+  bind_cols(at_test) %>%
+  metrics(truth = attrition, estimate = .pred_class)
+
+best_model %>%
+  predict(at_test, type = "prob")
+```
