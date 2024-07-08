@@ -62,13 +62,7 @@ at_test <- testing(attrition_split)
 
 ## Data Preprocessing
 
-Preparing an adequate preprocessing of the dataset in a recipe. Here are some hints to do the job:
-
--   Transform factors into numeric variables. Take into account that there are ordered and unordered factors.
--   Remove variables with low variance.
--   Remove variables highly correlated with other features.
-
-Also considering oversampling or undersampling to account for class imbalance.
+Preparing an adequate preprocessing of the dataset in a recipe. 
 
 ```{r}
 at_rec <- recipe(attrition ~ ., data = at_train) %>%
@@ -90,7 +84,7 @@ at_rec %>%
 
 ## Models
 
-Choosing two models that can be adequate for this dataset, and define workflows to integrate them with the recipe or recipes.
+Choosing two models that can be adequate for this dataset, and defining workflows to integrate them with the recipe or recipes.
 
 ```{r}
 # Logistic Regression Model
@@ -113,7 +107,7 @@ forest_workflow <- workflow() %>%
 
 ## Cross Validation
 
-Defining a cross validation scheme with five folds, and evaluate each of the models with the following metrics:
+Defining a cross validation scheme with five folds, and evaluating each of the models with the following metrics:
 
 -   Accuracy.
 -   Sensitivity.
@@ -152,7 +146,7 @@ forest_res %>%
 
 # Assessing Best Model
 
-Selecting the best model from the ones tested, train it with the whole train set and obtain the prediction metrics with the test set.
+Selecting the best model from the ones tested, training it with the whole train set and obtaining the prediction metrics with the test set.
 
 -\> We have an imbalanced dataset, with more negative than positive cases. When comparing the two models, the random forest model has better accuracy and specificity, making it highly effective at identifying negative cases. However, the logistic regression model (model 1) has significantly better sensitivity, which is crucial for identifying positive cases. Therefore, I chose the logistic regression model to better address the class imbalance and improve the detection of positive cases.
 
